@@ -9,42 +9,92 @@ import (
 
 // go test -v homework_test.go
 
-type CircularQueue struct {
-	values []int
-	// need to implement
+type ints interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 
-func NewCircularQueue(size int) CircularQueue {
-	return CircularQueue{} // need to implement
+type CircularQueue[T ints] struct {
+	front  int
+	rear   int
+	size   int
+	values []T
 }
 
-func (q *CircularQueue) Push(value int) bool {
-	return false // need to implement
+func NewCircularQueue[T ints](size int) CircularQueue[T] {
+	return CircularQueue[T]{
+		front:  -1,
+		rear:   -1,
+		values: make([]T, size),
+	}
 }
 
-func (q *CircularQueue) Pop() bool {
-	return false // need to implement
+func (q *CircularQueue[T]) Push(value T) bool {
+	if q.Full() {
+		return false
+	}
+
+	if q.front == -1 {
+		q.front = 0
+	}
+
+	q.size++
+
+	q.rear = (q.rear + 1) % len(q.values)
+	q.values[q.rear] = value
+
+	return true
 }
 
-func (q *CircularQueue) Front() int {
-	return -1 // need to implement
+func (q *CircularQueue[T]) Pop() bool {
+	if q.Empty() {
+		return false
+	}
+
+	if q.front == q.rear {
+		q.front = -1
+		q.rear = -1
+
+		return true
+	}
+
+	q.size--
+
+	q.front = (q.front + 1) % len(q.values)
+
+	return true
 }
 
-func (q *CircularQueue) Back() int {
-	return -1 // need to implement
+func (q *CircularQueue[T]) Front() T {
+	if q.Empty() {
+		return -1
+	}
+
+	return q.values[q.front]
 }
 
-func (q *CircularQueue) Empty() bool {
-	return false // need to implement
+func (q *CircularQueue[T]) Back() T {
+	if q.Empty() {
+		return -1
+	}
+
+	return q.values[q.rear]
 }
 
-func (q *CircularQueue) Full() bool {
-	return false // need to implement
+func (q *CircularQueue[T]) Empty() bool {
+	return q.front == -1
+}
+
+func (q *CircularQueue[T]) Full() bool {
+	if q.front == 0 {
+		return q.rear+1 == len(q.values)
+	}
+
+	return q.front == (q.rear+1)%len(q.values)
 }
 
 func TestCircularQueue(t *testing.T) {
 	const queueSize = 3
-	queue := NewCircularQueue(queueSize)
+	queue := NewCircularQueue[int](queueSize)
 
 	assert.True(t, queue.Empty())
 	assert.False(t, queue.Full())
