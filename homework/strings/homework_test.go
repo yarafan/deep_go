@@ -2,6 +2,9 @@ package main
 
 import (
 	"reflect"
+	"runtime"
+	"slices"
+	"sync"
 	"testing"
 	"unsafe"
 
@@ -9,29 +12,85 @@ import (
 )
 
 type COWBuffer struct {
-	data []byte
-	refs *int
-	// need to implement
+	data   []byte
+	refs   *int
+	mu     *sync.Mutex
+	closed bool
 }
 
 func NewCOWBuffer(data []byte) COWBuffer {
-	return COWBuffer{} // need to implement
+	buffer := COWBuffer{
+		data: unsafe.Slice(unsafe.SliceData(data), len(data)),
+		refs: new(int),
+		mu:   &sync.Mutex{},
+	}
+
+	runtime.SetFinalizer(&buffer, func(b *COWBuffer) {
+		if !b.closed {
+			b.Close()
+		}
+	})
+
+	return buffer
 }
 
 func (b *COWBuffer) Clone() COWBuffer {
-	return COWBuffer{} // need to implement
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	*b.refs++
+
+	buffer := COWBuffer{
+		data: unsafe.Slice(unsafe.SliceData(b.data), len(b.data)),
+		refs: b.refs,
+		mu:   b.mu,
+	}
+
+	runtime.SetFinalizer(&buffer, func(b *COWBuffer) {
+		if !b.closed {
+			b.Close()
+		}
+	})
+
+	return buffer
 }
 
 func (b *COWBuffer) Close() {
-	// need to implement
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if *b.refs > 0 {
+		*b.refs--
+	}
+
+	b.closed = true
+	b.data = nil
 }
 
 func (b *COWBuffer) Update(index int, value byte) bool {
-	return false // need to implement
+	if index < 0 || index > len(b.data)-1 {
+		return false
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if *b.refs > 1 {
+		dataCopy := slices.Clone(b.data)
+		dataCopy[index] = value
+
+		b.data = dataCopy
+
+		return true
+	}
+
+	b.data[index] = value
+
+	return true
 }
 
 func (b *COWBuffer) String() string {
-	return "" // need to implement
+	return unsafe.String(unsafe.SliceData(b.data), len(b.data))
 }
 
 func TestCOWBuffer(t *testing.T) {
