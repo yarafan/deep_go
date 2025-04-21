@@ -8,37 +8,178 @@ import (
 )
 
 // go test -v homework_test.go
+type Comparator[K any] func(a, b K) int
 
-type OrderedMap struct {
-	// need to implement
+type Node[K comparable, V any] struct {
+	parent *Node[K, V]
+	left   *Node[K, V]
+	right  *Node[K, V]
+	key    K
+	value  V
 }
 
-func NewOrderedMap() OrderedMap {
-	return OrderedMap{} // need to implement
+type OrderedMap[K comparable, V any] struct {
+	size       int
+	root       *Node[K, V]
+	comparator Comparator[K]
 }
 
-func (m *OrderedMap) Insert(key, value int) {
-	// need to implement
+func NewOrderedMap[K comparable, V any](cmp Comparator[K]) OrderedMap[K, V] {
+	return OrderedMap[K, V]{comparator: cmp}
 }
 
-func (m *OrderedMap) Erase(key int) {
-	// need to implement
+func (m *OrderedMap[K, V]) Insert(key K, value V) {
+	if m.root == nil {
+		m.root = &Node[K, V]{key: key, value: value}
+
+		m.size++
+
+		return
+	}
+
+	root := m.root
+	parent := (*Node[K, V])(nil)
+
+	for root != nil {
+		cmp := m.comparator(key, root.key)
+
+		if cmp == 0 {
+			root.value = value
+
+			return
+		}
+
+		parent = root
+		if cmp < 0 {
+			root = root.left
+		} else {
+			root = root.right
+		}
+	}
+
+	newNode := &Node[K, V]{key: key, value: value, parent: parent}
+	if m.comparator(key, parent.key) < 0 {
+		parent.left = newNode
+	} else {
+		parent.right = newNode
+	}
+
+	m.size++
 }
 
-func (m *OrderedMap) Contains(key int) bool {
-	return false // need to implement
+func (m *OrderedMap[K, V]) Erase(key K) {
+	node := m.findNode(key)
+	if node == nil {
+		return
+	}
+
+	if node.right == nil {
+		m.transplant(node, node.left)
+	} else {
+		successor := node.right
+
+		for successor.left != nil {
+			successor = successor.left
+		}
+
+		if successor.parent != node {
+			m.transplant(successor, successor.right)
+			successor.right = node.right
+			if successor.right != nil {
+				successor.right.parent = successor
+			}
+		}
+
+		m.transplant(node, successor)
+		successor.left = node.left
+		if successor.left != nil {
+			successor.left.parent = successor
+		}
+
+	}
+
+	m.size--
 }
 
-func (m *OrderedMap) Size() int {
-	return 0 // need to implement
+func (m *OrderedMap[K, V]) Contains(key K) bool {
+	node := m.findNode(key)
+
+	return node != nil
 }
 
-func (m *OrderedMap) ForEach(action func(int, int)) {
-	// need to implement
+func (m *OrderedMap[K, V]) Size() int {
+	return m.size
+}
+
+func (m *OrderedMap[K, V]) ForEach(action func(K, V)) {
+	stack := make([]*Node[K, V], 0)
+	curr := m.root
+
+	for curr != nil || len(stack) > 0 {
+		for curr != nil {
+			stack = append(stack, curr)
+			curr = curr.left
+		}
+
+		curr = stack[len(stack)-1]
+
+		action(curr.key, curr.value)
+
+		curr = curr.right
+		stack = stack[:len(stack)-1]
+	}
+}
+
+func (m *OrderedMap[K, V]) findNode(key K) *Node[K, V] {
+	root := m.root
+
+	for root != nil {
+		cmp := m.comparator(key, root.key)
+		if cmp == 0 {
+			return root
+		}
+
+		if cmp < 0 {
+			root = root.left
+		} else {
+			root = root.right
+		}
+	}
+
+	return nil
+}
+
+func (m *OrderedMap[K, V]) transplant(predecessor *Node[K, V], successor *Node[K, V]) {
+	if predecessor.parent == nil {
+		m.root = successor
+
+		return
+	}
+
+	if predecessor == predecessor.parent.left {
+		predecessor.parent.left = successor
+	} else {
+		predecessor.parent.right = successor
+	}
+
+	if successor != nil {
+		successor.parent = predecessor.parent
+	}
+}
+
+func intComparator(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func TestCircularQueue(t *testing.T) {
-	data := NewOrderedMap()
+	data := NewOrderedMap[int, int](intComparator)
 	assert.Zero(t, data.Size())
 
 	data.Insert(10, 10)
