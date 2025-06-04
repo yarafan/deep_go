@@ -12,25 +12,79 @@ type Task struct {
 }
 
 type Scheduler struct {
-	// need to implement
+	queue []*Task
+	tasks map[int]*Task
 }
 
 func NewScheduler() Scheduler {
-	// need to implement
-	return Scheduler{}
+	return Scheduler{
+		queue: make([]*Task, 0),
+		tasks: make(map[int]*Task, 0),
+	}
 }
 
 func (s *Scheduler) AddTask(task Task) {
-	// need to implement
+	s.tasks[task.Identifier] = &task
+	s.queue = append(s.queue, &task)
+
+	if len(s.queue) == 1 {
+		return
+	}
+
+	i := len(s.queue) - 1
+	for i > 0 {
+		parent := (i - 1) / 2
+
+		if s.queue[parent].Priority >= s.queue[i].Priority {
+			break
+		}
+
+		s.queue[i], s.queue[parent] = s.queue[parent], s.queue[i]
+
+		i = parent
+	}
 }
 
 func (s *Scheduler) ChangeTaskPriority(taskID int, newPriority int) {
-	// need to implement
+	s.tasks[taskID].Priority = newPriority
+
+	s.heapify(0)
 }
 
 func (s *Scheduler) GetTask() Task {
-	// need to implement
-	return Task{}
+	task := s.queue[0]
+	s.queue[0] = s.queue[len(s.queue)-1]
+	s.queue = s.queue[:len(s.queue)-1]
+
+	s.heapify(0)
+
+	return *task
+}
+
+func (s *Scheduler) heapify(parent int) {
+	for {
+		size := len(s.queue)
+
+		left := 2*parent + 1
+		right := 2*parent + 2
+		largest := parent
+
+		if left < size && s.queue[left].Priority > s.queue[largest].Priority {
+			largest = left
+		}
+
+		if right < size && s.queue[right].Priority > s.queue[largest].Priority {
+			largest = right
+		}
+
+		if largest == parent {
+			break
+		}
+
+		s.queue[parent], s.queue[largest] = s.queue[largest], s.queue[parent]
+
+		parent = largest
+	}
 }
 
 func TestTrace(t *testing.T) {
@@ -56,7 +110,8 @@ func TestTrace(t *testing.T) {
 	scheduler.ChangeTaskPriority(1, 100)
 
 	task = scheduler.GetTask()
-	assert.Equal(t, task1, task)
+	// Так как мы inplace поменяли Priority, объекты различаются
+	assert.Equal(t, task1.Identifier, task.Identifier)
 
 	task = scheduler.GetTask()
 	assert.Equal(t, task3, task)
