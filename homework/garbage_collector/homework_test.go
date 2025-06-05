@@ -11,8 +11,36 @@ import (
 // go test -v homework_test.go
 
 func Trace(stacks [][]uintptr) []uintptr {
-	// need to implement
-	return nil
+	visited := make(map[uintptr]struct{})
+	result := make([]uintptr, 0)
+	queue := make([]uintptr, 0)
+
+	enqueue := func(ptr uintptr) {
+		if ptr == 0 {
+			return
+		}
+
+		if _, seen := visited[ptr]; !seen {
+			visited[ptr] = struct{}{}
+			queue = append(queue, ptr)
+			result = append(result, ptr)
+		}
+	}
+
+	for _, frame := range stacks {
+		for _, ptr := range frame {
+			enqueue(ptr)
+		}
+	}
+
+	for i := range len(queue) {
+		ptrToPtr := (*uintptr)(unsafe.Pointer(queue[i]))
+		if ptrToPtr != nil {
+			enqueue(*ptrToPtr)
+		}
+	}
+
+	return result
 }
 
 func TestTrace(t *testing.T) {
@@ -54,8 +82,8 @@ func TestTrace(t *testing.T) {
 		uintptr(unsafe.Pointer(&heapObjects[1])),
 		uintptr(unsafe.Pointer(&heapObjects[2])),
 		uintptr(unsafe.Pointer(&heapPointer4)),
-		uintptr(unsafe.Pointer(&heapPointer3)),
 		uintptr(unsafe.Pointer(&heapObjects[3])),
+		uintptr(unsafe.Pointer(&heapPointer3)),
 	}
 
 	assert.True(t, reflect.DeepEqual(expectedPointers, pointers))
